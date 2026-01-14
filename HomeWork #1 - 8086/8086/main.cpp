@@ -1,107 +1,146 @@
 #include <iostream>
 #include <fstream>
 #include <map>
+#include <bitset>
 using namespace std;
 
-
-struct Register {
-    char highByte = 0;
-    char lowByte = 0;
+struct Register
+{
+    u_char highByte = 0;
+    u_char lowByte = 0;
 };
 
+// struct ProcessorMemory {
+//     std::map<Register>
+// };
 
-//struct ProcessorMemory {
-//    std::map<Register>
-//};
+std::map<u_char, std::string> wideRegistersNames = {{0b0, "ax"},
+                                                    {0b001, "cx"},
+                                                    {0b010, "dx"},
+                                                    {0b011, "bx"},
+                                                    {0b100, "sp"},
+                                                    {0b101, "bp"},
+                                                    {0b110, "si"},
+                                                    {0b111, "di"}};
 
-std::map<char, std::string> wideRegistersNames = {{0b0, "AX"},
-                                                 {0b001, "CX"},
-                                                 {0b010, "DX"},
-                                                 {0b011, "BX"},
-                                                 {0b100, "SP"},
-                                                 {0b101, "BP"},
-                                                 {0b110, "SI"},
-                                                 {0b111, "DI"}};
+std::map<u_char, std::string> byteRegisterNames = {{0b0, "al"},
+                                                   {0b001, "cl"},
+                                                   {0b010, "dl"},
+                                                   {0b011, "bl"},
+                                                   {0b100, "ah"},
+                                                   {0b101, "ch"},
+                                                   {0b110, "dh"},
+                                                   {0b111, "bh"}};
 
-std::map<char, std::string> byteRegisterNames = {{0b0, "AL"},
-                                                {0b001, "CL"},
-                                                {0b010, "DL"},
-                                                {0b011, "BL"},
-                                                {0b100, "AH"},
-                                                {0b101, "CH"},
-                                                {0b110, "DH"},
-                                                {0b111, "BH"}};
-
-enum Mode {
+enum Mode
+{
     MemMode = 0b00,
     MemMode8Bit = 0b00000001,
     MemMode16Bit = 0b00000010,
     RegMode = 0b00000011
 };
 
-namespace Instructions {
-    const char MOV = 0b00100010;
+namespace Instructions
+{
+    namespace MOV {
+    const u_char MOV_REG_MEM_TO_FROM_REG = 0b100010;
+    const u_char MOV_IMID_TO_REG_MEM = 0b1100011; 
+    const u_char MOV_IMID_TO_REG = 0b1011;
+    const u_char MOV_MEM_TO_ACC = 0b1010000;
+    const u_char MOV_ACC_TO_MEM = 0b1010001;
+    
+
+    }
 }
 
-std::map<char, std::string> instructionToString = {{Instructions::MOV,"MOV"}};
+std::map<u_char, std::string> instructionToString = {{Instructions::MOV::MOV_REG_MEM_TO_FROM_REG, "mov"},
+                                                    {Instructions::MOV::MOV_IMID_TO_REG_MEM, "mov"},
+                                                    {Instructions::MOV::MOV_IMID_TO_REG, "mov"},
+                                                    {Instructions::MOV::MOV_MEM_TO_ACC, "mov"},
+                                                    {Instructions::MOV::MOV_ACC_TO_MEM, "mov"}};
 
-
-int main(int argc, char** argv)
+int main(int argc, char **argv)
 {
-    if (argc <= 1) {
+    if (argc <= 1)
+    {
         std::cout << "Please provide bin file in 16 bit architecture" << std::endl;
     }
-    char* fileName = argv[1];
-
+    char *fileName = argv[1];
 
     ifstream filestream(fileName, std::ios::binary);
-    if (filestream) {
-        char inputHigh;
-        char inputLow;
-        while (filestream >> inputHigh) {
+    if (filestream)
+    {
+        u_char inputHigh;
+        u_char inputLow;
+        std::cout << "bits 16" << std::endl
+                  << std::endl;
+        while (filestream >> inputHigh)
+        {
             filestream >> inputLow;
+            std::cout << static_cast<bitset<8>>(inputHigh) << std::endl;
+            std::cout << static_cast<bitset<8>>(inputLow) << std::endl;
+            bool dest = (inputHigh & 2) == 1;
+            bool wide = (inputHigh & 1) == 1;
 
-            bool dest = (inputHigh &= 2) == 1;
-            bool wide = (inputHigh &= 1) == 1;
+            u_char srcReg;
+            u_char destReg;
 
-            char srcReg;
-            char destReg;
-
-            if (dest) {
-                srcReg = (inputLow >> 3) & 7;
-                destReg = inputLow & 7;
-            } else {
-                destReg = (inputLow >> 3) & 7;
+            if (dest)
+            {
+                destReg = (inputLow >> 3) & 0b111;
                 srcReg = inputLow & 7;
             }
-            char mode = inputLow << 6;
-
+            else
+            {
+                srcReg = (inputLow >> 3) & 0b111;
+                destReg = inputLow & 7;
+            }
+            u_char mode = inputLow >> 6;
 
             std::string srcRegName;
             std::string destRegName;
-            if (mode == Mode::RegMode) {
-                if (wide) {
+            // std::cout << static_cast<std::bitset<8>>(mode);
+            if (mode == Mode::RegMode)
+            {
+                // std::cout << "Entered reg mode";
+                if (wide)
+                {
                     srcRegName = wideRegistersNames[srcReg];
                     destRegName = wideRegistersNames[destReg];
-                } else {
+                }
+                else
+                {
                     srcRegName = byteRegisterNames[srcReg];
                     destRegName = byteRegisterNames[destReg];
                 }
             }
-            char instruction = inputHigh >> 2;
-            std::string instructionName = instructionToString[instruction];
-            std::cout << instructionName << " " << destRegName << "," << srcRegName << std::endl;
-
-            switch (instruction) {
-                case Instructions::MOV:
+            u_char instruction = inputHigh;
+            for (int i = 0; i <= 8; ++i) {
+                instruction >>= 1;
+                if (instructionToString.find(instruction) != instructionToString.end()) {
                     break;
-//                default:
-//                    std::cout << "unknown instruction" << std::endl;
+                }
+            }
+            if (instruction == 0) {
+                std::cout << "unknown instruction: " << std::bitset<8>(inputHigh);
+                return 0;
+            }
+            // std::cout << static_cast<std::bitset<8>>(inputHigh);
+
+            // std::cout << static_cast<std::bitset<8>>(instruction);
+            std::string instructionName = instructionToString[instruction];
+            std::cout << instructionName << " " << destRegName << ", " << srcRegName << std::endl;
+
+            switch (instruction)
+            {
+            case Instructions::MOV::MOV_REG_MEM_TO_FROM_REG:
+                break;
+                //                default:
+                //                    std::cout << "unknown instruction" << std::endl;
             }
         }
-
     }
 
-//    cout << "Hello World!" << endl;
+    //    cout << "Hello World!" << endl;
     return 0;
 }
